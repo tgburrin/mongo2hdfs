@@ -2,7 +2,7 @@
  * MongoUtilities.cpp
  *
  *  Created on: Mar 27, 2018
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #include "MongoUtilities.h"
@@ -32,24 +32,24 @@ vector<string> MongoUtilities::getShardUris(string mongosURI) {
 
 	const bson_t *doc;
 	while (mongoc_cursor_next (c, &doc)) {
-        bson_iter_t i;
-        bson_iter_init(&i, doc);
+		bson_iter_t i;
+		bson_iter_init(&i, doc);
 
-        if(bson_iter_find(&i, "host")) {
-        	istringstream ins(bson_iter_utf8(&i, NULL));
+		if(bson_iter_find(&i, "host")) {
+			istringstream ins(bson_iter_utf8(&i, NULL));
 
-        	vector<string> p;
-        	string s;
+			vector<string> p;
+			string s;
 
-        	while(getline(ins, s, '/'))
-        		p.push_back(s);
+			while(getline(ins, s, '/'))
+				p.push_back(s);
 
-        	rv.push_back("mongodb://"+p[1]+"/?replicaSet="+p[0]);
-        }
+			rv.push_back("mongodb://"+p[1]+"/?replicaSet="+p[0]);
+		}
 	}
 
-    if (mongoc_cursor_error(c, &error))
-        cerr << error.message << endl;
+	if (mongoc_cursor_error(c, &error))
+		cerr << error.message << endl;
 
 	bson_destroy(query);
 	mongoc_collection_destroy(shards);

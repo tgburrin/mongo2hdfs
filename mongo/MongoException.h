@@ -2,7 +2,7 @@
  * MongoException.h
  *
  *  Created on: Apr 2, 2018
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #ifndef MONGO_MONGOEXCEPTION_H_

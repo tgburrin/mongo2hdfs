@@ -2,7 +2,7 @@
  * ProcessCfg.h
  *
  *  Created on: Oct 10, 2017
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #ifndef PROCESSCFG_H_

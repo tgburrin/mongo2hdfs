@@ -2,7 +2,7 @@
  * HdfsFileException.h
  *
  *  Created on: Apr 7, 2018
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #ifndef HDFS_HDFSFILEEXCEPTION_H_

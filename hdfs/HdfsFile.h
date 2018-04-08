@@ -2,7 +2,7 @@
  * HdfsFile.h
  *
  *  Created on: Apr 7, 2018
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #ifndef HDFS_HDFSFILE_H_
@@ -30,6 +30,8 @@ private:
 	struct hdfsBuilder *hdfsCfg = NULL;
 	hdfsFS fileSystem = NULL;
 	hdfsFile fileDescriptor = NULL;
+
+	uint32_t batchCounter = 0;
 
 	void init();
 	bool closeFile();

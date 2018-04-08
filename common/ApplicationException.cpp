@@ -2,7 +2,7 @@
  * ApplicationException.cpp
  *
  *  Created on: Oct 13, 2017
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #include "ApplicationException.h"

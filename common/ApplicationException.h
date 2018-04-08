@@ -2,7 +2,7 @@
  * ApplicationException.h
  *
  *  Created on: Oct 13, 2017
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #ifndef APPLICATIONEXCEPTION_H_

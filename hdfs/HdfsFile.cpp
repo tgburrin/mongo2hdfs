@@ -2,7 +2,7 @@
  * HdfsFile.cpp
  *
  *  Created on: Apr 7, 2018
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #include "HdfsFile.h"
@@ -28,8 +28,8 @@ HdfsFile::~HdfsFile() {
 }
 
 void HdfsFile::init() {
-    if ( lck == NULL )
-        lck = new mutex();
+	if ( lck == NULL )
+		lck = new mutex();
 
 	if ( hdfsCfg == NULL ) {
 		hdfsCfg = hdfsNewBuilder();
@@ -67,7 +67,13 @@ bool HdfsFile::openFile(string fn) {
 	return true;
 }
 bool HdfsFile::writeToFile(string message) {
-	return hdfsWrite(fileSystem, fileDescriptor, message.c_str(), message.length()) >= 0 ? true : false;
+	bool rv = hdfsWrite(fileSystem, fileDescriptor, (message + "\n").c_str(), message.length()+1) >= 0 ? true : false;
+	batchCounter++;
+	if ( batchCounter >= 1000 ) {
+		flushFile();
+		batchCounter = 0;
+	}
+	return rv;
 }
 
 bool HdfsFile::changeFile(string newFileName) {

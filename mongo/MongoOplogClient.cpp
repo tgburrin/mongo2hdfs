@@ -2,7 +2,7 @@
  * MongoOplogClient.cpp
  *
  *  Created on: Mar 31, 2018
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #include "MongoOplogClient.h"
@@ -24,7 +24,7 @@ void MongoOplogClient::startCursor() {
 			"}",
 			"ns", "{",
 				"$ne", "",
-			    "$regex", "^(?!(config\\.|admin\\.))(?!.*(\\.\\$cmd$))",  // Revmoe admin db/config db/and commands
+				"$regex", "^(?!(config\\.|admin\\.))(?!.*(\\.\\$cmd$))",  // Revmoe admin db/config db/and commands
 			"}",
 			"op", "{",
 				"$ne", "n", // Remove notifications

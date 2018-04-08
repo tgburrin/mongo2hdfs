@@ -2,13 +2,13 @@
  * ProcessCfg.cpp
  *
  *  Created on: Oct 10, 2017
- *      Author: tgburrin
+ *	  Author: tgburrin
  */
 
 #include "ProcessCfg.h"
 
 ProcessCfg::ProcessCfg(string cfgFile) {
-    _ParseConfig(cfgFile);
+	_ParseConfig(cfgFile);
 }
 
 ProcessCfg::~ProcessCfg() {
@@ -16,30 +16,30 @@ ProcessCfg::~ProcessCfg() {
 
 void ProcessCfg::_ParseConfig (string config_file) {
 	Json::Value doc;
-    Json::CharReaderBuilder crb;
+	Json::CharReaderBuilder crb;
 
-    string errors;
+	string errors;
 
-    ifstream infile(config_file.c_str());
+	ifstream infile(config_file.c_str());
 
-    if ( !Json::parseFromStream(crb, infile, &doc, &errors) )
-    	throw ApplicationException("Could not parse config file "+config_file+": "+errors);
+	if ( !Json::parseFromStream(crb, infile, &doc, &errors) )
+		throw ApplicationException("Could not parse config file "+config_file+": "+errors);
 
-    infile.close();
+	infile.close();
 
-    vector<string> required = {"MongosURI", "HDFSNameNode", "HDFSUsername", "HDFSPath"};
-    for ( auto req : required ) {
-        if ( doc[req].isNull() || doc[req].asString().empty())
-        	throw ApplicationException(req+" must be provided in the configuration");
-    }
+	vector<string> required = {"MongosURI", "HDFSNameNode", "HDFSUsername", "HDFSPath"};
+	for ( auto req : required ) {
+		if ( doc[req].isNull() || doc[req].asString().empty())
+			throw ApplicationException(req+" must be provided in the configuration");
+	}
 
-    mongosURI = doc["MongosURI"].asString();
-    hdfsNameNode = doc["HDFSNameNode"].asString();
-    hdfsUsername = doc["HDFSUsername"].asString();
-    hdfsBasePath = doc["HDFSPath"].asString();
+	mongosURI = doc["MongosURI"].asString();
+	hdfsNameNode = doc["HDFSNameNode"].asString();
+	hdfsUsername = doc["HDFSUsername"].asString();
+	hdfsBasePath = doc["HDFSPath"].asString();
 
-    if ( !doc["HDFSPort"].isNull() )
-    	hdfsPort = doc["HDFSPort"].asUInt();
+	if ( !doc["HDFSPort"].isNull() )
+		hdfsPort = doc["HDFSPort"].asUInt();
 }
 
 bool ProcessCfg::DebugEnabled() {

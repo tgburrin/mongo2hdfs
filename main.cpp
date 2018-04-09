@@ -7,6 +7,11 @@
 
 #include <unistd.h>
 
+// MAC OSX specific include
+#ifdef __APPLE_CC__
+#include <libgen.h>
+#endif
+
 #include <mongoc.h>
 
 #include "common/ProcessCfg.h"
@@ -22,7 +27,13 @@ void consumeEvents(string clusterURI, string shardURI, unordered_map<string, Hdf
 	MongoOplogClient mc = MongoOplogClient(clusterURI, shardURI);
 
 	while(mc.readOplogEvent()) {
-		MongoMessage *m = mc.getEvent();
+		MongoMessage *m = NULL;
+		try {
+			 m = mc.getEvent();
+		} catch (MongoException *e) {
+			cerr << e->what() << endl << flush;
+			exit(EXIT_FAILURE);
+		}
 
 		f->lck->lock();
 		f->writeToFile(m->message);
@@ -69,25 +80,28 @@ int main (int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	ProcessCfg cfg = ProcessCfg(configFile);
+	ProcessCfg *cfg;
+	try {
+		cfg = new ProcessCfg(configFile);
+	} catch (ApplicationException *e) {
+		cerr << e->what() << endl << flush;
+		exit(EXIT_FAILURE);
+	}
 
 	unordered_map<string, HdfsFile> fileMap;
 
-	HdfsFile *f = new HdfsFile(cfg.getHdfsUsername(), cfg.getHdfsNameNode());
+	HdfsFile *f = new HdfsFile(cfg->getHdfsUsername(), cfg->getHdfsNameNode());
 	try {
-		f->setBasePath(cfg.getHdfsBasePath());
-
-		f->openFile("myTestFile.txt");
-		f->writeToFile("This is a bunch of text\n");
-
-	} catch (HdfsFileException e) {
-		cerr << e.what() << endl;
+		f->setBasePath(cfg->getHdfsBasePath());
+		f->openFile("testFile.txt");
+	} catch (HdfsFileException *e) {
+		cerr << e->what() << endl;
 		exit(EXIT_FAILURE);
 	}
 
 	mongoc_init ();
 
-	string clusterURI = cfg.getMongosURI();
+	string clusterURI = cfg->getMongosURI();
 	vector<string> shards = MongoUtilities::getShardUris(clusterURI);
 
 	vector<thread> children;
@@ -99,4 +113,6 @@ int main (int argc, char **argv) {
 			children.at(i).join();
 
 	mongoc_cleanup();
+
+	delete cfg;
 }

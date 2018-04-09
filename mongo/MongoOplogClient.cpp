@@ -18,7 +18,12 @@ MongoOplogClient::~MongoOplogClient() {
 }
 
 void MongoOplogClient::startCursor() {
+	time_t currentTime = time(NULL);
+
 	bson_t *filter = BCON_NEW(
+			"ts", "{",
+				"$gte", BCON_TIMESTAMP(currentTime, 0),
+			"}",
 			"fromMigrate", "{",
 				"$ne", BCON_BOOL(true),
 			"}",
@@ -29,7 +34,13 @@ void MongoOplogClient::startCursor() {
 			"op", "{",
 				"$ne", "n", // Remove notifications
 			"}");
-	bson_t *options = BCON_NEW("tailable", BCON_BOOL(true), "maxAwaitTimeMS", BCON_INT64(10));
+
+	bson_t *options = BCON_NEW(
+			"tailable", BCON_BOOL(true),
+			"maxAwaitTimeMS", BCON_INT64(10),
+			"sort", "{", "$natural", BCON_INT32(1), "}",
+			"oplogReplay", BCON_BOOL(true)
+			);
 
 	cur = mongoc_collection_find_with_opts(oplogCollection, filter, options, NULL);
 
@@ -70,7 +81,22 @@ void MongoOplogClient::connectToMongo() {
 
 	oplogCollection = mongoc_client_get_collection(cli, "local", "oplog.rs");
 
-	cout << "There are " << mongoc_collection_count(oplogCollection, MONGOC_QUERY_NONE, bson_new(), 0, 0, NULL, NULL) << "  events" << endl << flush;
+	/*
+	bson_t *filter = BCON_NEW(
+			"fromMigrate", "{",
+				"$ne", BCON_BOOL(true),
+			"}",
+			"ns", "{",
+				"$ne", "",
+				"$regex", "^(?!(config\\.|admin\\.))(?!.*(\\.\\$cmd$))",  // Revmoe admin db/config db/and commands
+			"}",
+			"op", "{",
+				"$ne", "n", // Remove notifications
+			"}");
+	*/
+	bson_t *filter = bson_new();
+	cout << "There are " << mongoc_collection_count(oplogCollection, MONGOC_QUERY_NONE, filter, 0, 0, NULL, NULL) << "  events" << endl << flush;
+	bson_destroy(filter);
 }
 
 bson_t *MongoOplogClient::lookupDocument(string dbname, string collection, bson_t *id) {
@@ -87,6 +113,10 @@ bson_t *MongoOplogClient::lookupDocument(string dbname, string collection, bson_
 
 		rv = bson_copy(doc);
 	}
+
+	// The Document could not be located
+	if ( rv == NULL )
+		rv = bson_copy(id);
 
 	mongoc_cursor_destroy(f);
 	mongoc_collection_destroy(c);
@@ -152,9 +182,16 @@ MongoMessage *MongoOplogClient::getEvent() {
 	const uint8_t *data;
 
 	// Updates hide the search criteria in 'o2' and that's what we need to look up the doc (now out of date)
-	dbOperation.compare("u") == 0 ?
+	bool foundLogDoc = dbOperation.compare("u") == 0 ?
 			bson_iter_init_find(&docIterator, oplogEvent, "o2") :
 			bson_iter_init_find(&docIterator, oplogEvent, "o");
+
+	if ( !foundLogDoc ) {
+		errStream.clear();
+		errStream << "Event document not found for message: " << endl
+				<< bson_as_canonical_extended_json(oplogEvent, NULL) << endl;
+		throw MongoException(errStream.str());
+	}
 
 	bson_iter_document(&docIterator, &msglen, &data);
 
@@ -172,6 +209,10 @@ MongoMessage *MongoOplogClient::getEvent() {
 		underlyingDocument = &doc;
 	}
 
+	if ( underlyingDocument == NULL )
+		throw MongoException("Unable to locate underlying document");
+
+	// TODO Put error handling around whether or not the underlyingDocument got properly populated
 	bson_t *msg = BCON_NEW("operation", BCON_UTF8(dbOperation.c_str()), "document", BCON_DOCUMENT(underlyingDocument));
 
 	// This must be assigned to a char * and then to a string so that the pointer may be freed later on

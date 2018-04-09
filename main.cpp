@@ -7,6 +7,11 @@
 
 #include <unistd.h>
 
+// MAC OSX specific include
+#ifdef __APPLE_CC__
+#include <libgen.h>
+#endif
+
 #include <mongoc.h>
 
 #include "common/ProcessCfg.h"
@@ -18,17 +23,25 @@
 
 using namespace std;
 
-void consumeEvents(string clusterURI, string shardURI, unordered_map<string, HdfsFile> fileMap, HdfsFile *f) {
+void consumeEvents(bool *running, string clusterURI, string shardURI, unordered_map<string, HdfsFile> fileMap, HdfsFile *f) {
 	MongoOplogClient mc = MongoOplogClient(clusterURI, shardURI);
 
-	while(mc.readOplogEvent()) {
-		MongoMessage *m = mc.getEvent();
+	while ( *running ) {
+		while(mc.readOplogEvent()) {
+			MongoMessage *m = NULL;
+			try {
+				 m = mc.getEvent();
+			} catch (MongoException *e) {
+				cerr << e->what() << endl << flush;
+				exit(EXIT_FAILURE);
+			}
 
-		f->lck->lock();
-		f->writeToFile(m->message);
-		f->lck->unlock();
+			f->lck->lock();
+			f->writeToFile(m->message);
+			f->lck->unlock();
 
-		delete m;
+			delete m;
+		}
 	}
 }
 
@@ -43,6 +56,7 @@ string PrintUsage( string program_name ) {
 }
 
 int main (int argc, char **argv) {
+	bool running = true;
 	string configFile;
 
 	int opt;
@@ -69,34 +83,39 @@ int main (int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	ProcessCfg cfg = ProcessCfg(configFile);
+	ProcessCfg *cfg;
+	try {
+		cfg = new ProcessCfg(configFile);
+	} catch (ApplicationException *e) {
+		cerr << e->what() << endl << flush;
+		exit(EXIT_FAILURE);
+	}
 
 	unordered_map<string, HdfsFile> fileMap;
 
-	HdfsFile *f = new HdfsFile(cfg.getHdfsUsername(), cfg.getHdfsNameNode());
+	HdfsFile *f = new HdfsFile(cfg->getHdfsUsername(), cfg->getHdfsNameNode());
 	try {
-		f->setBasePath(cfg.getHdfsBasePath());
-
-		f->openFile("myTestFile.txt");
-		f->writeToFile("This is a bunch of text\n");
-
-	} catch (HdfsFileException e) {
-		cerr << e.what() << endl;
+		f->setBasePath(cfg->getHdfsBasePath());
+		f->openFile("testFile.txt");
+	} catch (HdfsFileException *e) {
+		cerr << e->what() << endl;
 		exit(EXIT_FAILURE);
 	}
 
 	mongoc_init ();
 
-	string clusterURI = cfg.getMongosURI();
+	string clusterURI = cfg->getMongosURI();
 	vector<string> shards = MongoUtilities::getShardUris(clusterURI);
 
 	vector<thread> children;
 	for( auto shard : shards )
-		children.push_back(thread(consumeEvents, clusterURI, shard, fileMap, f));
+		children.push_back(thread(consumeEvents, &running, clusterURI, shard, fileMap, f));
 
 	for( uint i = 0; i < children.size(); i++ )
 		if( children.at(i).joinable() )
 			children.at(i).join();
 
 	mongoc_cleanup();
+
+	delete cfg;
 }

@@ -11,6 +11,7 @@
 #include <iostream>
 #include <sstream>
 #include <cstring>
+#include <ctime>
 #include <list>
 
 #include <mongoc.h>

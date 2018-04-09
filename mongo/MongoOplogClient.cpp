@@ -18,7 +18,12 @@ MongoOplogClient::~MongoOplogClient() {
 }
 
 void MongoOplogClient::startCursor() {
+	time_t currentTime = time(NULL);
+
 	bson_t *filter = BCON_NEW(
+			"ts", "{",
+				"$gte", BCON_TIMESTAMP(currentTime, 0),
+			"}",
 			"fromMigrate", "{",
 				"$ne", BCON_BOOL(true),
 			"}",
@@ -30,7 +35,12 @@ void MongoOplogClient::startCursor() {
 				"$ne", "n", // Remove notifications
 			"}");
 
-	bson_t *options = BCON_NEW("tailable", BCON_BOOL(true), "maxAwaitTimeMS", BCON_INT64(10));
+	bson_t *options = BCON_NEW(
+			"tailable", BCON_BOOL(true),
+			"maxAwaitTimeMS", BCON_INT64(10),
+			"sort", "{", "$natural", BCON_INT32(1), "}",
+			"oplogReplay", BCON_BOOL(true)
+			);
 
 	cur = mongoc_collection_find_with_opts(oplogCollection, filter, options, NULL);
 

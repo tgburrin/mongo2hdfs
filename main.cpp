@@ -23,23 +23,25 @@
 
 using namespace std;
 
-void consumeEvents(string clusterURI, string shardURI, unordered_map<string, HdfsFile> fileMap, HdfsFile *f) {
+void consumeEvents(bool *running, string clusterURI, string shardURI, unordered_map<string, HdfsFile> fileMap, HdfsFile *f) {
 	MongoOplogClient mc = MongoOplogClient(clusterURI, shardURI);
 
-	while(mc.readOplogEvent()) {
-		MongoMessage *m = NULL;
-		try {
-			 m = mc.getEvent();
-		} catch (MongoException *e) {
-			cerr << e->what() << endl << flush;
-			exit(EXIT_FAILURE);
+	while ( *running ) {
+		while(mc.readOplogEvent()) {
+			MongoMessage *m = NULL;
+			try {
+				 m = mc.getEvent();
+			} catch (MongoException *e) {
+				cerr << e->what() << endl << flush;
+				exit(EXIT_FAILURE);
+			}
+
+			f->lck->lock();
+			f->writeToFile(m->message);
+			f->lck->unlock();
+
+			delete m;
 		}
-
-		f->lck->lock();
-		f->writeToFile(m->message);
-		f->lck->unlock();
-
-		delete m;
 	}
 }
 
@@ -54,6 +56,7 @@ string PrintUsage( string program_name ) {
 }
 
 int main (int argc, char **argv) {
+	bool running = true;
 	string configFile;
 
 	int opt;
@@ -106,7 +109,7 @@ int main (int argc, char **argv) {
 
 	vector<thread> children;
 	for( auto shard : shards )
-		children.push_back(thread(consumeEvents, clusterURI, shard, fileMap, f));
+		children.push_back(thread(consumeEvents, &running, clusterURI, shard, fileMap, f));
 
 	for( uint i = 0; i < children.size(); i++ )
 		if( children.at(i).joinable() )

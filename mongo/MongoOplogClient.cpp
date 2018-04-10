@@ -220,6 +220,7 @@ MongoMessage *MongoOplogClient::getEvent() {
 	char *cmsg = bson_as_canonical_extended_json(msg, NULL);
 
 	MongoMessage *m = new MongoMessage();
+	m->dbNamespace = dbNamespace;
 	m->message = cmsg;
 	m->operation = dbOperation;
 	m->timestamp = timestamp;

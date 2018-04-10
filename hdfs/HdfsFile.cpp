@@ -7,10 +7,7 @@
 
 #include "HdfsFile.h"
 
-HdfsFile::HdfsFile(string u, string h) : username(u), hostname(h) {
-	init();
-}
-HdfsFile::HdfsFile(string u, string h, uint32_t p) : username(u), hostname(h), port(p) {
+HdfsFile::HdfsFile(string u, string h, uint32_t p, string bp) : username(u), hostname(h), port(p), basePath(bp) {
 	init();
 }
 
@@ -44,13 +41,6 @@ void HdfsFile::init() {
 	}
 }
 
-void HdfsFile::setBasePath(string bp) {
-	basePath = bp;
-}
-string HdfsFile::getBasePath() {
-	return basePath;
-}
-
 bool HdfsFile::openFile(string fn) {
 	if ( fileDescriptor != NULL )
 		return true;
@@ -60,6 +50,7 @@ bool HdfsFile::openFile(string fn) {
 	if ( fileSystem == NULL )
 		throw HdfsFileException("Filesystem handle has not been initialized");
 
+	// Read/write + append, default buffer size, replication factor (1 for testing), default block size
 	fileDescriptor = hdfsOpenFile(fileSystem, (basePath + "/" + fileName).c_str(), O_WRONLY|O_APPEND, 0, 1, 0);
 	if ( fileDescriptor == NULL )
 		throw HdfsFileException("Unable to initialize the file descriptor: "+string(hdfsGetLastError()));

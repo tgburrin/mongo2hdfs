@@ -14,11 +14,15 @@
 #include <mutex>
 
 #include <hdfs/hdfs.h>
+
 #include "HdfsFileException.h"
+#include "HdfsFileFactory.h"
 
 using namespace std;
 
 class HdfsFile {
+friend class HdfsFileFactory;
+
 private:
 	string username;
 	string hostname;
@@ -33,24 +37,18 @@ private:
 
 	uint32_t batchCounter = 0;
 
-	void init();
 	bool closeFile();
 	bool flushFile();
+	bool openFile(string);
+	bool changeFile(string);
+	void init();
+
+	HdfsFile(string, string, uint32_t, string);
 
 public:
 	mutex *lck = NULL;
-
-	HdfsFile(string, string);
-	HdfsFile(string, string, uint32_t);
-
-	void setBasePath(string);
-	string getBasePath();
-
-	bool openFile(string);
 	bool writeToFile(string);
-
-	bool changeFile(string);
-
+	// We might want to make this private and have a cleaning process
 	virtual ~HdfsFile();
 };
 

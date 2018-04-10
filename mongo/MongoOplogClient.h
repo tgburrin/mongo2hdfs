@@ -17,8 +17,8 @@
 #include <mongoc.h>
 #include <bson.h>
 
-#include "MongoException.h"
 #include "MongoMessage.h"
+#include "MongoException.h"
 
 using namespace std;
 

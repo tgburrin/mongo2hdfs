@@ -5,6 +5,9 @@
  *	  Author: tgburrin
  */
 
+#ifndef MONGO_MONGOUTILITIES_H_
+#define MONGO_MONGOUTILITIES_H_
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -15,14 +18,14 @@
 
 using namespace std;
 
-#ifndef MONGO_MONGOUTILITIES_H_
-#define MONGO_MONGOUTILITIES_H_
+#include "MongoException.h"
+#include "MongoShardInfo.h"
 
 class MongoUtilities {
 public:
 	MongoUtilities();
 	virtual ~MongoUtilities();
-	static vector<string> getShardUris(string);
+	static vector<MongoShardInfo> getShardUris(string);
 };
 
 #endif /* MONGO_MONGOUTILITIES_H_ */

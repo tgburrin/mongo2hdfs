@@ -17,7 +17,7 @@ class MongoMessage {
 public:
 	string operation;
 	string message;
-	string dbname;
+	string dbNamespace;
 
 	uint32_t timestamp;
 	uint32_t txnoffset;

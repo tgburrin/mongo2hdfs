@@ -16,6 +16,8 @@
 #include <mongoc.h>
 
 #include "common/ProcessCfg.h"
+#include "common/BookmarkManager.h"
+
 #include "mongo/MongoUtilities.h"
 #include "mongo/MongoOplogClient.h"
 #include "mongo/MongoMessage.h"
@@ -31,10 +33,9 @@ void consumeEvents(bool *running,
 		MongoShardInfo shardInfo,
 		unordered_map<string, HdfsFile*> *fileMap,
 		HdfsFileFactory *f,
-		mutex *fileCreatorLock,
-		uint32_t threadNum) {
+		mutex *fileCreatorLock) {
 
-	MongoOplogClient mc = MongoOplogClient(clusterURI, shardInfo.shardURI);
+	MongoOplogClient mc = MongoOplogClient(clusterURI, shardInfo.getShardURI());
 
 	while ( *running ) {
 		while(mc.readOplogEvent()) {
@@ -126,6 +127,8 @@ int main (int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
+	BookmarkManager book = BookmarkManager(cfg->getStatePath());
+
 	unordered_map<string, HdfsFile*> *fileMap = new unordered_map<string, HdfsFile*>();
 
 	HdfsFileFactory *fileCreator = new HdfsFileFactory(cfg->getHdfsUsername(), cfg->getHdfsNameNode(), cfg->getHdfsBasePath());
@@ -135,14 +138,25 @@ int main (int argc, char **argv) {
 	mongoc_init ();
 
 	string clusterURI = cfg->getMongosURI();
-	vector<MongoShardInfo> shards = MongoUtilities::getShardUris(clusterURI);
-
-	uint32_t childCount = 1;
-	vector<thread> children;
-	for( auto shard : shards ) {
-		children.push_back(thread(consumeEvents, &running, clusterURI, shard, fileMap, fileCreator, &fileCreatorLock, childCount));
-		childCount++;
+	vector<MongoShardInfo> shards;
+	try {
+		shards = MongoUtilities::getShardUris(clusterURI, &book);
+	} catch ( MongoException &e ) {
+		cerr << e.what() << endl;
+		exit(EXIT_FAILURE);
 	}
+
+	for ( auto shard : shards ) {
+		cout << shard.getShardName() << endl;
+		if ( shard.getBookmark() != NULL )
+			cout << bson_as_canonical_extended_json(shard.getBookmark(), NULL) << endl;
+	}
+
+	exit(EXIT_SUCCESS);
+
+	vector<thread> children;
+	for( auto shard : shards )
+		children.push_back(thread(consumeEvents, &running, clusterURI, shard, fileMap, fileCreator, &fileCreatorLock));
 
 	for( uint i = 0; i < children.size(); i++ )
 		if( children.at(i).joinable() )

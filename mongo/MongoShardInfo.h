@@ -10,15 +10,37 @@
 
 #include <iostream>
 
+#include <bson.h>
+
+#include "../common/BookmarkManager.h"
+
 using namespace std;
 
 class MongoShardInfo {
-public:
+private:
+	friend class MongoUtilities;
+
 	string shardName;
 	string shardURI;
 
-	MongoShardInfo(string, string);
+	uint32_t timestamp;
+	uint32_t increment;
+
+	BookmarkManager *bookmark;
+
+	bson_t *findTs =  NULL;
+
+	MongoShardInfo(string, string, BookmarkManager *);
+	void refreshBookmark();
+
+public:
 	virtual ~MongoShardInfo();
+
+	string getShardName();
+	string getShardURI();
+
+	bson_t *getBookmark();
+	void updateBookmark(uint32_t, uint32_t);
 };
 
 #endif /* MONGO_MONGOSHARDINFO_H_ */

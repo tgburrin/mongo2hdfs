@@ -20,12 +20,16 @@ using namespace std;
 
 #include "MongoException.h"
 #include "MongoShardInfo.h"
+#include "../common/BookmarkManager.h"
 
+class MongoShardInfo;
 class MongoUtilities {
-public:
+private:
 	MongoUtilities();
 	virtual ~MongoUtilities();
-	static vector<MongoShardInfo> getShardUris(string);
+
+public:
+	static vector<MongoShardInfo> getShardUris(string,BookmarkManager *);
 };
 
 #endif /* MONGO_MONGOUTILITIES_H_ */

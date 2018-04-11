@@ -10,7 +10,7 @@
 MongoUtilities::MongoUtilities() {}
 MongoUtilities::~MongoUtilities() {}
 
-vector<MongoShardInfo> MongoUtilities::getShardUris(string mongosURI) {
+vector<MongoShardInfo> MongoUtilities::getShardUris(string mongosURI, BookmarkManager *book) {
 	bson_error_t error;
 
 	vector<MongoShardInfo> rv;
@@ -38,7 +38,8 @@ vector<MongoShardInfo> MongoUtilities::getShardUris(string mongosURI) {
 			while(getline(ins, s, '/'))
 				p.push_back(s);
 
-			rv.push_back(MongoShardInfo(p[0], "mongodb://"+p[1]+"/?replicaSet="+p[0]));
+			MongoShardInfo ms(p[0], "mongodb://"+p[1]+"/?replicaSet="+p[0], book);
+			rv.push_back(ms);
 		}
 	}
 

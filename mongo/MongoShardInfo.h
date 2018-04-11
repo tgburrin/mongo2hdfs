@@ -23,12 +23,12 @@ private:
 	string shardName;
 	string shardURI;
 
-	uint32_t timestamp;
-	uint32_t increment;
+	uint32_t timestamp = 0;
+	uint32_t increment = 0;
 
 	BookmarkManager *bookmark;
 
-	bson_t *findTs =  NULL;
+	bson_t *findTs = NULL;
 
 	MongoShardInfo(string, string, BookmarkManager *);
 	void refreshBookmark();

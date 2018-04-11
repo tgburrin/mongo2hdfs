@@ -141,18 +141,13 @@ int main (int argc, char **argv) {
 	vector<MongoShardInfo> shards;
 	try {
 		shards = MongoUtilities::getShardUris(clusterURI, &book);
+	} catch ( ApplicationException &e ) {
+		cerr << e.what() << endl;
+		exit(EXIT_FAILURE);
 	} catch ( MongoException &e ) {
 		cerr << e.what() << endl;
 		exit(EXIT_FAILURE);
 	}
-
-	for ( auto shard : shards ) {
-		cout << shard.getShardName() << endl;
-		if ( shard.getBookmark() != NULL )
-			cout << bson_as_canonical_extended_json(shard.getBookmark(), NULL) << endl;
-	}
-
-	exit(EXIT_SUCCESS);
 
 	vector<thread> children;
 	for( auto shard : shards )

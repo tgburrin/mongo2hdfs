@@ -8,6 +8,8 @@
 #include "BookmarkManager.h"
 
 BookmarkManager::BookmarkManager(string dbPath) {
+	lck = new mutex();
+
 	sqlite3_stmt *stmt;
 
 	if ( sqlite3_open(dbPath.c_str(), &db) != SQLITE_OK )
@@ -33,23 +35,34 @@ BookmarkManager::BookmarkManager(string dbPath) {
 }
 
 BookmarkManager::~BookmarkManager() {
-	sqlite3_close(db);
+	if ( db != NULL )
+		sqlite3_close(db);
 }
 
 bool BookmarkManager::getTimestampBookmarkValues(string shardName, uint32_t *timestamp, uint32_t *increment) {
 	bool rv = false;
-	sqlite3_stmt *stmt;
 	uint32_t rows = 0;
 
-	string query = "select epoch_time, txn_offset from sqlite_master where shard_id = '"+shardName+"'";
-	sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, NULL);
+	string query = "select epoch_time, txn_offset from mongo_bookmarks where shard_id = ?";
 
+	lck->lock();
+	sqlite3_stmt *stmt = NULL;
+	if ( sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, NULL) != SQLITE_OK ) {
+		string errmsg = "Could not prepare statement: ";
+		errmsg.append(sqlite3_errmsg(db));
+		throw ApplicationException(errmsg);
+	}
+
+	sqlite3_bind_text(stmt, 1, shardName.c_str(), shardName.length(), SQLITE_STATIC);
 	while(sqlite3_step(stmt) != SQLITE_DONE) {
 		rv = true;
 		*timestamp = sqlite3_column_int(stmt, 0);
 		*increment = sqlite3_column_int(stmt, 1);
+		rows++;
 	}
+	if ( stmt != NULL )
+		sqlite3_finalize(stmt);
+	lck->unlock();
 
-	sqlite3_finalize(stmt);
 	return rv;
 }

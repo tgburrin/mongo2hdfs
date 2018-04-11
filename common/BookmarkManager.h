@@ -9,6 +9,7 @@
 #define COMMON_BOOKMARKMANAGER_H_
 
 #include <iostream>
+#include <mutex>
 
 #include <bson.h>
 #include <sqlite3.h>
@@ -19,7 +20,8 @@ using namespace std;
 
 class BookmarkManager {
 private:
-	sqlite3 *db;
+	sqlite3 *db = NULL;
+	mutex *lck = NULL;
 
 public:
 	BookmarkManager(string);

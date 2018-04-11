@@ -11,8 +11,8 @@ MongoShardInfo::MongoShardInfo(string name, string uri, BookmarkManager *book) :
 	refreshBookmark();
 }
 MongoShardInfo::~MongoShardInfo() {
-	if ( findTs != NULL )
-		bson_destroy(findTs);
+	//if ( findTs != NULL )
+	//	bson_destroy(findTs);
 }
 
 string MongoShardInfo::getShardName() {

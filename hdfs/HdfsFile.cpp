@@ -59,9 +59,14 @@ bool HdfsFile::openFile(string fn) {
 }
 bool HdfsFile::writeToFile(string message) {
 	bool rv = hdfsWrite(fileSystem, fileDescriptor, (message + "\n").c_str(), message.length()+1) >= 0 ? true : false;
+	if ( !rv )
+		throw HdfsFileException("Write to "+fileName+" failed");
+
+	rv = false;
 	batchCounter++;
 	if ( batchCounter >= 1000 ) {
 		flushFile();
+		rv = true;
 		batchCounter = 0;
 	}
 	return rv;

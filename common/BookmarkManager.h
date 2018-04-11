@@ -26,7 +26,7 @@ private:
 public:
 	BookmarkManager(string);
 	virtual ~BookmarkManager();
-	void setBookmark(string, uint32_t, uint32_t);
+	void setBookmark(string, uint32_t *, uint32_t *);
 	bson_t *getTimestampBookmark(string);
 	bool getTimestampBookmarkValues(string, uint32_t *, uint32_t *);
 };

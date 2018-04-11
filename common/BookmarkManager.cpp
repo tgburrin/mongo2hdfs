@@ -66,3 +66,30 @@ bool BookmarkManager::getTimestampBookmarkValues(string shardName, uint32_t *tim
 
 	return rv;
 }
+
+void BookmarkManager::setBookmark(string shardName, uint32_t *timestamp, uint32_t *increment) {
+	string query = "insert or replace into mongo_bookmarks(shard_id, epoch_time, txn_offset) values (?, ?, ?)";
+
+	lck->lock();
+	sqlite3_stmt *stmt = NULL;
+	if ( sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, NULL) != SQLITE_OK ) {
+		string errmsg = "Could not prepare statement: ";
+		errmsg.append(sqlite3_errmsg(db));
+		throw ApplicationException(errmsg);
+	}
+
+	sqlite3_bind_text(stmt, 1, shardName.c_str(), shardName.length(), SQLITE_STATIC);
+	sqlite3_bind_int(stmt, 2, *timestamp);
+	sqlite3_bind_int(stmt, 3, *increment);
+
+	if (sqlite3_step(stmt) != SQLITE_DONE) {
+		string errmsg = "Could not update bookmark rowt: ";
+		errmsg.append(sqlite3_errmsg(db));
+		throw ApplicationException(errmsg);
+	}
+
+	//int numRows = sqlite3_changes(db);
+	if ( stmt != NULL )
+		sqlite3_finalize(stmt);
+	lck->unlock();
+}

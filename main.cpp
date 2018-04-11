@@ -38,7 +38,7 @@ void consumeEvents(bool *running,
 	MongoOplogClient mc = MongoOplogClient(clusterURI, shardInfo.getShardURI());
 
 	while ( *running ) {
-		while(mc.readOplogEvent()) {
+		while(mc.readOplogEvent(shardInfo.getBookmark())) {
 			MongoMessage *m = NULL;
 			try {
 				 m = mc.getEvent();
@@ -73,11 +73,13 @@ void consumeEvents(bool *running,
 			}
 
 			fd->lck->lock();
-			fd->writeToFile(m->message);
+			if ( fd->writeToFile(m->message) )
+				shardInfo.updateBookmark(m->timestamp, m->txnoffset);
 			fd->lck->unlock();
 
 			delete m;
 		}
+		usleep(500);
 	}
 }
 
@@ -127,15 +129,14 @@ int main (int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	BookmarkManager book = BookmarkManager(cfg->getStatePath());
-
 	unordered_map<string, HdfsFile*> *fileMap = new unordered_map<string, HdfsFile*>();
-
 	HdfsFileFactory *fileCreator = new HdfsFileFactory(cfg->getHdfsUsername(), cfg->getHdfsNameNode(), cfg->getHdfsBasePath());
 
 	mutex fileCreatorLock;
 
 	mongoc_init ();
+
+	BookmarkManager book = BookmarkManager(cfg->getStatePath());
 
 	string clusterURI = cfg->getMongosURI();
 	vector<MongoShardInfo> shards;

@@ -11,8 +11,11 @@ MongoShardInfo::MongoShardInfo(string name, string uri, BookmarkManager *book) :
 	refreshBookmark();
 }
 MongoShardInfo::~MongoShardInfo() {
-	//if ( findTs != NULL )
-	//	bson_destroy(findTs);
+	/* This causes a pointer to be freed twice
+	 * this should be verified in some way
+	if ( findTs != NULL )
+		bson_destroy(findTs);
+	*/
 }
 
 string MongoShardInfo::getShardName() {
@@ -31,4 +34,10 @@ void MongoShardInfo::refreshBookmark() {
 	bool rv = bookmark->getTimestampBookmarkValues(shardName, &timestamp, &increment);
 	if ( rv )
 		findTs = BCON_NEW("ts", "{", "$gt", BCON_TIMESTAMP(timestamp, increment), "}");
+}
+
+void MongoShardInfo::updateBookmark(uint32_t ts, uint32_t inc) {
+	timestamp = ts;
+	increment = inc;
+	bookmark->setBookmark(shardName, &timestamp, &increment);
 }

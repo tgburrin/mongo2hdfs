@@ -42,6 +42,8 @@ void HdfsFile::init() {
 }
 
 bool HdfsFile::openFile(string fn) {
+	uint32_t replicationFactor = 3;
+
 	if ( fileDescriptor != NULL )
 		return true;
 
@@ -51,7 +53,7 @@ bool HdfsFile::openFile(string fn) {
 		throw HdfsFileException("Filesystem handle has not been initialized");
 
 	// Read/write + append, default buffer size, replication factor (1 for testing), default block size
-	fileDescriptor = hdfsOpenFile(fileSystem, (basePath + "/" + fileName).c_str(), O_WRONLY|O_APPEND, 0, 1, 0);
+	fileDescriptor = hdfsOpenFile(fileSystem, (basePath + "/" + fileName).c_str(), O_WRONLY|O_APPEND, 0, replicationFactor, 0);
 	if ( fileDescriptor == NULL )
 		throw HdfsFileException("Unable to initialize the file descriptor: "+string(hdfsGetLastError()));
 

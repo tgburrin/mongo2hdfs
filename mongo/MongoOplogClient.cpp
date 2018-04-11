@@ -21,8 +21,8 @@ void MongoOplogClient::startCursor(bson_t *bookmark) {
 	time_t currentTime = time(NULL);
 
 	if ( bookmark == NULL )
-		bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(0, 0), "}");
-		//bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(currentTime, 0), "}");
+		bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(currentTime, 0), "}");
+		//bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(0, 0), "}");
 
 	bson_t *filter = BCON_NEW(
 			"fromMigrate", "{",

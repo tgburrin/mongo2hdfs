@@ -30,6 +30,8 @@ private:
 	string hdfsBasePath;
 	uint32_t hdfsPort = 0;
 
+	string statePath;
+
 public:
 	ProcessCfg(string);
 	virtual ~ProcessCfg();
@@ -41,6 +43,7 @@ public:
 	string getHdfsUsername();
 	string getHdfsBasePath();
 	uint32_t getHdfsPort();
+	string getStatePath();
 };
 
 #endif /* PROCESSCFG_H_ */

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <mutex>
 #include <vector>
 #include <list>
 #include <unordered_map>
@@ -15,19 +16,29 @@
 #include <mongoc.h>
 
 #include "common/ProcessCfg.h"
+#include "common/BookmarkManager.h"
+
 #include "mongo/MongoUtilities.h"
 #include "mongo/MongoOplogClient.h"
 #include "mongo/MongoMessage.h"
+#include "mongo/MongoShardInfo.h"
 
 #include "hdfs/HdfsFile.h"
+#include "hdfs/HdfsFileFactory.h"
 
 using namespace std;
 
-void consumeEvents(bool *running, string clusterURI, string shardURI, unordered_map<string, HdfsFile> fileMap, HdfsFile *f) {
-	MongoOplogClient mc = MongoOplogClient(clusterURI, shardURI);
+void consumeEvents(bool *running,
+		string clusterURI,
+		MongoShardInfo shardInfo,
+		unordered_map<string, HdfsFile*> *fileMap,
+		HdfsFileFactory *f,
+		mutex *fileCreatorLock) {
+
+	MongoOplogClient mc = MongoOplogClient(clusterURI, shardInfo.getShardURI());
 
 	while ( *running ) {
-		while(mc.readOplogEvent()) {
+		while(mc.readOplogEvent(shardInfo.getBookmark())) {
 			MongoMessage *m = NULL;
 			try {
 				 m = mc.getEvent();
@@ -36,12 +47,39 @@ void consumeEvents(bool *running, string clusterURI, string shardURI, unordered_
 				exit(EXIT_FAILURE);
 			}
 
-			f->lck->lock();
-			f->writeToFile(m->message);
-			f->lck->unlock();
+			HdfsFile *fd = NULL;
+
+			// A large area to lock up, but the alternative (a dirty read) does not work
+			fileCreatorLock->lock();
+			unordered_map<string, HdfsFile*>::const_iterator fdFind = fileMap->find(m->dbNamespace);
+			if ( fdFind == fileMap->end() ) {
+				try {
+					fd = f->getFile(m->dbNamespace+".txt");
+				} catch ( HdfsFileException &e ) {
+					cerr << e.what() << endl << flush;
+					exit(EXIT_FAILURE);
+				}
+				pair<string, HdfsFile *> newFileHandle(m->dbNamespace, fd);
+
+				fileMap->insert(newFileHandle);
+			} else {
+				fd = fdFind->second;
+			}
+			fileCreatorLock->unlock();
+
+			if ( fd == NULL ) {
+				cerr << "Unable to open fd" << endl << flush;
+				exit(EXIT_FAILURE);
+			}
+
+			fd->lck->lock();
+			if ( fd->writeToFile(m->message) )
+				shardInfo.updateBookmark(m->timestamp, m->txnoffset);
+			fd->lck->unlock();
 
 			delete m;
 		}
+		usleep(500);
 	}
 }
 
@@ -91,25 +129,30 @@ int main (int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	unordered_map<string, HdfsFile> fileMap;
+	unordered_map<string, HdfsFile*> *fileMap = new unordered_map<string, HdfsFile*>();
+	HdfsFileFactory *fileCreator = new HdfsFileFactory(cfg->getHdfsUsername(), cfg->getHdfsNameNode(), cfg->getHdfsBasePath());
 
-	HdfsFile *f = new HdfsFile(cfg->getHdfsUsername(), cfg->getHdfsNameNode());
-	try {
-		f->setBasePath(cfg->getHdfsBasePath());
-		f->openFile("testFile.txt");
-	} catch (HdfsFileException *e) {
-		cerr << e->what() << endl;
-		exit(EXIT_FAILURE);
-	}
+	mutex fileCreatorLock;
 
 	mongoc_init ();
 
+	BookmarkManager book = BookmarkManager(cfg->getStatePath());
+
 	string clusterURI = cfg->getMongosURI();
-	vector<string> shards = MongoUtilities::getShardUris(clusterURI);
+	vector<MongoShardInfo> shards;
+	try {
+		shards = MongoUtilities::getShardUris(clusterURI, &book);
+	} catch ( ApplicationException &e ) {
+		cerr << e.what() << endl;
+		exit(EXIT_FAILURE);
+	} catch ( MongoException &e ) {
+		cerr << e.what() << endl;
+		exit(EXIT_FAILURE);
+	}
 
 	vector<thread> children;
 	for( auto shard : shards )
-		children.push_back(thread(consumeEvents, &running, clusterURI, shard, fileMap, f));
+		children.push_back(thread(consumeEvents, &running, clusterURI, shard, fileMap, fileCreator, &fileCreatorLock));
 
 	for( uint i = 0; i < children.size(); i++ )
 		if( children.at(i).joinable() )
@@ -117,5 +160,7 @@ int main (int argc, char **argv) {
 
 	mongoc_cleanup();
 
+	delete fileMap;
+	delete fileCreator;
 	delete cfg;
 }

@@ -17,8 +17,8 @@
 #include <mongoc.h>
 #include <bson.h>
 
-#include "MongoException.h"
 #include "MongoMessage.h"
+#include "MongoException.h"
 
 using namespace std;
 
@@ -41,7 +41,7 @@ private:
 	const bson_t *oplogEvent;
 
 	void connectToMongo(void);
-	void startCursor();
+	void startCursor(bson_t *);
 	bson_t *lookupDocument(string, string, bson_t *);
 	void close();
 
@@ -49,7 +49,7 @@ public:
 	MongoOplogClient(string, string);
 	virtual ~MongoOplogClient();
 
-	bool readOplogEvent();
+	bool readOplogEvent(bson_t *);
 	MongoMessage *getEvent();
 };
 

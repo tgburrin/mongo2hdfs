@@ -27,11 +27,10 @@ void ProcessCfg::_ParseConfig (string config_file) {
 
 	infile.close();
 
-	vector<string> required = {"MongosURI", "HDFSNameNode", "HDFSUsername", "HDFSPath"};
-	for ( auto req : required ) {
+	vector<string> required = {"MongosURI", "HDFSNameNode", "HDFSUsername", "HDFSPath", "StatePath"};
+	for ( auto req : required )
 		if ( doc[req].isNull() || doc[req].asString().empty())
 			throw ApplicationException(req+" must be provided in the configuration");
-	}
 
 	mongosURI = doc["MongosURI"].asString();
 	hdfsNameNode = doc["HDFSNameNode"].asString();
@@ -40,6 +39,8 @@ void ProcessCfg::_ParseConfig (string config_file) {
 
 	if ( !doc["HDFSPort"].isNull() )
 		hdfsPort = doc["HDFSPort"].asUInt();
+
+	statePath = doc["StatePath"].asString();
 }
 
 bool ProcessCfg::DebugEnabled() {
@@ -64,4 +65,8 @@ string ProcessCfg::getHdfsBasePath() {
 
 uint32_t ProcessCfg::getHdfsPort() {
 	return hdfsPort;
+}
+
+string ProcessCfg::getStatePath() {
+	return statePath;
 }

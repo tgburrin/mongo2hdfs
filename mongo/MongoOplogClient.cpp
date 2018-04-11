@@ -17,13 +17,14 @@ MongoOplogClient::~MongoOplogClient() {
 	close();
 }
 
-void MongoOplogClient::startCursor() {
+void MongoOplogClient::startCursor(bson_t *bookmark) {
 	time_t currentTime = time(NULL);
 
+	if ( bookmark == NULL )
+		bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(currentTime, 0), "}");
+		//bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(0, 0), "}");
+
 	bson_t *filter = BCON_NEW(
-			"ts", "{",
-				"$gte", BCON_TIMESTAMP(currentTime, 0),
-			"}",
 			"fromMigrate", "{",
 				"$ne", BCON_BOOL(true),
 			"}",
@@ -35,9 +36,11 @@ void MongoOplogClient::startCursor() {
 				"$ne", "n", // Remove notifications
 			"}");
 
+	bson_concat(filter, bookmark);
+
 	bson_t *options = BCON_NEW(
 			"tailable", BCON_BOOL(true),
-			"maxAwaitTimeMS", BCON_INT64(10),
+			"maxAwaitTimeMS", BCON_INT64(1000),
 			"sort", "{", "$natural", BCON_INT32(1), "}",
 			"oplogReplay", BCON_BOOL(true)
 			);
@@ -48,9 +51,9 @@ void MongoOplogClient::startCursor() {
 	bson_destroy(options);
 }
 
-bool MongoOplogClient::readOplogEvent() {
+bool MongoOplogClient::readOplogEvent(bson_t *bookmark) {
 	if ( cur == NULL )
-		startCursor();
+		startCursor(bookmark);
 
 	return mongoc_cursor_next(cur, &oplogEvent);
 }
@@ -81,7 +84,7 @@ void MongoOplogClient::connectToMongo() {
 
 	oplogCollection = mongoc_client_get_collection(cli, "local", "oplog.rs");
 
-	/*
+	/* If we wish to filter for just the updates we're interested in
 	bson_t *filter = BCON_NEW(
 			"fromMigrate", "{",
 				"$ne", BCON_BOOL(true),
@@ -220,6 +223,7 @@ MongoMessage *MongoOplogClient::getEvent() {
 	char *cmsg = bson_as_canonical_extended_json(msg, NULL);
 
 	MongoMessage *m = new MongoMessage();
+	m->dbNamespace = dbNamespace;
 	m->message = cmsg;
 	m->operation = dbOperation;
 	m->timestamp = timestamp;

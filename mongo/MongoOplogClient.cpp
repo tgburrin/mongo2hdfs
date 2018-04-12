@@ -17,12 +17,14 @@ MongoOplogClient::~MongoOplogClient() {
 	close();
 }
 
-void MongoOplogClient::startCursor(bson_t *bookmark) {
+void MongoOplogClient::startCursor(bson_t *bookmark, bool initializeFromOplogStart) {
 	time_t currentTime = time(NULL);
 
 	if ( bookmark == NULL )
-		bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(currentTime, 0), "}");
-		//bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(0, 0), "}");
+		if ( initializeFromOplogStart )
+			bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(0, 0), "}");
+		else
+			bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(currentTime, 0), "}");
 
 	bson_t *filter = BCON_NEW(
 			"fromMigrate", "{",
@@ -51,9 +53,9 @@ void MongoOplogClient::startCursor(bson_t *bookmark) {
 	bson_destroy(options);
 }
 
-bool MongoOplogClient::readOplogEvent(bson_t *bookmark) {
+bool MongoOplogClient::readOplogEvent(bson_t *bookmark, bool initializeFromOplogStart) {
 	if ( cur == NULL )
-		startCursor(bookmark);
+		startCursor(bookmark, initializeFromOplogStart);
 
 	return mongoc_cursor_next(cur, &oplogEvent);
 }

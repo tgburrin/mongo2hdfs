@@ -33,12 +33,20 @@ void ProcessCfg::_ParseConfig (string config_file) {
 			throw ApplicationException(req+" must be provided in the configuration");
 
 	mongosURI = doc["MongosURI"].asString();
+
+	initializeFromStart = false;
+	if ( !doc["MongoInitializeOplogStart"].isNull() )
+		initializeFromStart = doc["MongoInitializeOplogStart"].asBool();
+
 	hdfsNameNode = doc["HDFSNameNode"].asString();
 	hdfsUsername = doc["HDFSUsername"].asString();
 	hdfsBasePath = doc["HDFSPath"].asString();
 
 	if ( !doc["HDFSPort"].isNull() )
 		hdfsPort = doc["HDFSPort"].asUInt();
+
+	if ( !doc["HDFSReplicationFactor"].isNull() )
+		hdfsReplicationFactor = doc["HDFSReplicationFactor"].asUInt();
 
 	statePath = doc["StatePath"].asString();
 }
@@ -49,6 +57,10 @@ bool ProcessCfg::DebugEnabled() {
 
 string ProcessCfg::getMongosURI() {
 	return mongosURI;
+}
+
+bool ProcessCfg::getMongoInitFromStart() {
+	return initializeFromStart;
 }
 
 string ProcessCfg::getHdfsNameNode() {
@@ -65,6 +77,10 @@ string ProcessCfg::getHdfsBasePath() {
 
 uint32_t ProcessCfg::getHdfsPort() {
 	return hdfsPort;
+}
+
+uint32_t ProcessCfg::getHdfsReplicationFactor() {
+	return hdfsReplicationFactor;
 }
 
 string ProcessCfg::getStatePath() {

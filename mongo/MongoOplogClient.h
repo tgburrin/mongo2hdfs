@@ -41,7 +41,7 @@ private:
 	const bson_t *oplogEvent;
 
 	void connectToMongo(void);
-	void startCursor(bson_t *);
+	void startCursor(bson_t *, bool);
 	bson_t *lookupDocument(string, string, bson_t *);
 	void close();
 
@@ -49,7 +49,7 @@ public:
 	MongoOplogClient(string, string);
 	virtual ~MongoOplogClient();
 
-	bool readOplogEvent(bson_t *);
+	bool readOplogEvent(bson_t *, bool);
 	MongoMessage *getEvent();
 };
 

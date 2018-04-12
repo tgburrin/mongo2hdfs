@@ -26,7 +26,7 @@ friend class HdfsFileFactory;
 private:
 	string username;
 	string hostname;
-	uint32_t port = 8020;
+	uint32_t port;
 
 	string basePath;
 	string fileName;
@@ -35,15 +35,15 @@ private:
 	hdfsFS fileSystem = NULL;
 	hdfsFile fileDescriptor = NULL;
 
-	uint32_t batchCounter = 0;
+	uint32_t batchCounter;
+	uint32_t replicationFactor;
 
 	bool closeFile();
 	bool flushFile();
 	bool openFile(string);
 	bool changeFile(string);
-	void init();
 
-	HdfsFile(string, string, uint32_t, string);
+	HdfsFile(string, string, uint32_t, uint32_t, string);
 
 public:
 	mutex *lck = NULL;

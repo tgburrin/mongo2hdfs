@@ -11,7 +11,7 @@ MongoException::MongoException(string msg): message(msg) {}
 
 MongoException::MongoException(const char *msg): message(msg) {}
 
-MongoException::~MongoException() {}
+MongoException::~MongoException() throw() {}
 
 const char* MongoException::what()
 {

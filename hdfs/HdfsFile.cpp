@@ -7,24 +7,9 @@
 
 #include "HdfsFile.h"
 
-HdfsFile::HdfsFile(string u, string h, uint32_t p, string bp) : username(u), hostname(h), port(p), basePath(bp) {
-	init();
-}
+HdfsFile::HdfsFile(string u, string h, uint32_t p, uint32_t rf, string bp) : username(u), hostname(h), port(p), replicationFactor(rf), basePath(bp) {
+	batchCounter = 0;
 
-HdfsFile::~HdfsFile() {
-	closeFile();
-
-	if ( fileSystem != NULL )
-		hdfsDisconnect(fileSystem);
-
-
-	if ( hdfsCfg != NULL )
-		hdfsFreeBuilder(hdfsCfg);
-
-	delete lck;
-}
-
-void HdfsFile::init() {
 	if ( lck == NULL )
 		lck = new mutex();
 
@@ -41,9 +26,20 @@ void HdfsFile::init() {
 	}
 }
 
-bool HdfsFile::openFile(string fn) {
-	uint32_t replicationFactor = 3;
+HdfsFile::~HdfsFile() {
+	closeFile();
 
+	if ( fileSystem != NULL )
+		hdfsDisconnect(fileSystem);
+
+
+	if ( hdfsCfg != NULL )
+		hdfsFreeBuilder(hdfsCfg);
+
+	delete lck;
+}
+
+bool HdfsFile::openFile(string fn) {
 	if ( fileDescriptor != NULL )
 		return true;
 
@@ -83,6 +79,7 @@ bool HdfsFile::closeFile() {
 	bool rv = false;
 
 	if ( fileSystem != NULL && fileDescriptor != NULL ) {
+		cout << "Flushing " << fileName << endl << flush;
 		flushFile();
 		rv = hdfsCloseFile(fileSystem, fileDescriptor) == 0 ? true : false;
 	}

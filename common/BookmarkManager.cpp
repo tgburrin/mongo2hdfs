@@ -7,11 +7,11 @@
 
 #include "BookmarkManager.h"
 
-BookmarkManager::BookmarkManager(string dbPath) {
+BookmarkManager::BookmarkManager(ProcessCfg *cfg) {
+	string dbPath = cfg->getStatePath();
 	lck = new mutex();
 
-	sqlite3_stmt *stmt;
-
+	sqlite3_stmt *stmt = NULL;
 	if ( sqlite3_open(dbPath.c_str(), &db) != SQLITE_OK )
 		throw ApplicationException("Unable to open db "+dbPath+": "+sqlite3_errmsg(db));
 
@@ -20,9 +20,7 @@ BookmarkManager::BookmarkManager(string dbPath) {
 	uint32_t numTables = 0;
 	while (sqlite3_step(stmt) != SQLITE_DONE)
 		numTables++;
-
 	sqlite3_finalize(stmt);
-	stmt = NULL;
 
 	if ( numTables > 1 ) {
 		throw ApplicationException("Too many rows returned while checking for mongo_bookmarks table");

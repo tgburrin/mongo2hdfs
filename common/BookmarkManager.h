@@ -14,6 +14,7 @@
 #include <bson.h>
 #include <sqlite3.h>
 
+#include "ProcessCfg.h"
 #include "ApplicationException.h"
 
 using namespace std;
@@ -24,7 +25,7 @@ private:
 	mutex *lck = NULL;
 
 public:
-	BookmarkManager(string);
+	BookmarkManager(ProcessCfg *);
 	virtual ~BookmarkManager();
 	void setBookmark(string, uint32_t *, uint32_t *);
 	bson_t *getTimestampBookmark(string);

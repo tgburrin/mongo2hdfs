@@ -9,6 +9,7 @@
 #define HDFS_HDFSFILEFACTORY_H_
 
 #include "HdfsFile.h"
+#include "../common/ProcessCfg.h"
 
 using namespace std;
 
@@ -18,10 +19,11 @@ class HdfsFileFactory {
 	string hostname;
 	string basePath = "/";
 
-	uint32_t port = 8020;
+	uint32_t port;
+	uint32_t replicationFactor;
 
 public:
-	HdfsFileFactory(string, string, string);
+	HdfsFileFactory(ProcessCfg *);
 	virtual ~HdfsFileFactory();
 
 	void setPort(uint32_t);

@@ -1,9 +1,10 @@
 #include <iostream>
-#include <string>
+#include <csignal>
+
 #include <thread>
 #include <mutex>
+
 #include <vector>
-#include <list>
 #include <unordered_map>
 
 #include <unistd.h>
@@ -28,18 +29,28 @@
 
 using namespace std;
 
+// Ugh a global, but the signal handler will need this
+bool running = true;
+
 void consumeEvents(bool *running,
 		string clusterURI,
 		MongoShardInfo shardInfo,
+		bool initializeFromOplogStart,
 		unordered_map<string, HdfsFile*> *fileMap,
 		HdfsFileFactory *f,
 		mutex *fileCreatorLock) {
 
 	MongoOplogClient mc = MongoOplogClient(clusterURI, shardInfo.getShardURI());
 
+	MongoMessage *m = NULL;
+
 	while ( *running ) {
-		while(mc.readOplogEvent(shardInfo.getBookmark())) {
-			MongoMessage *m = NULL;
+		while(mc.readOplogEvent(shardInfo.getBookmark(), initializeFromOplogStart)) {
+			if ( m != NULL ) {
+				delete m;
+				m = NULL;
+			}
+
 			try {
 				 m = mc.getEvent();
 			} catch (MongoException *e) {
@@ -76,10 +87,24 @@ void consumeEvents(bool *running,
 			if ( fd->writeToFile(m->message) )
 				shardInfo.updateBookmark(m->timestamp, m->txnoffset);
 			fd->lck->unlock();
-
-			delete m;
 		}
-		usleep(500);
+		this_thread::yield();
+	}
+	if ( m != NULL ) {
+		shardInfo.updateBookmark(m->timestamp, m->txnoffset);
+		delete m;
+		m = NULL;
+	}
+}
+
+void gracefulShutdown( int signum ) {
+	switch(signum) {
+	case SIGINT:
+		cout << "Shutting down" << endl << flush;
+		running = false;
+		break;
+	default:
+		cout << "Received signal #" << signum << endl << flush;
 	}
 }
 
@@ -94,7 +119,6 @@ string PrintUsage( string program_name ) {
 }
 
 int main (int argc, char **argv) {
-	bool running = true;
 	string configFile;
 
 	int opt;
@@ -129,14 +153,21 @@ int main (int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
+	signal(SIGINT, &gracefulShutdown);
+
+	// Shared by all threads since they will all have records from sharded collections
 	unordered_map<string, HdfsFile*> *fileMap = new unordered_map<string, HdfsFile*>();
-	HdfsFileFactory *fileCreator = new HdfsFileFactory(cfg->getHdfsUsername(), cfg->getHdfsNameNode(), cfg->getHdfsBasePath());
+
+	// The class for creating new filehandles / collection
+	HdfsFileFactory *fileCreator = new HdfsFileFactory(cfg);
 
 	mutex fileCreatorLock;
 
 	mongoc_init ();
 
-	BookmarkManager book = BookmarkManager(cfg->getStatePath());
+	// Created separately for now as we might want a dedicated writer thread that will update
+	// the shard bookmarks
+	BookmarkManager book = BookmarkManager(cfg);
 
 	string clusterURI = cfg->getMongosURI();
 	vector<MongoShardInfo> shards;
@@ -152,11 +183,16 @@ int main (int argc, char **argv) {
 
 	vector<thread> children;
 	for( auto shard : shards )
-		children.push_back(thread(consumeEvents, &running, clusterURI, shard, fileMap, fileCreator, &fileCreatorLock));
+		children.push_back(thread(consumeEvents, &running, clusterURI, shard, cfg->getMongoInitFromStart(), fileMap, fileCreator, &fileCreatorLock));
 
 	for( uint i = 0; i < children.size(); i++ )
 		if( children.at(i).joinable() )
 			children.at(i).join();
+
+	unordered_map<string, HdfsFile*>::const_iterator i;
+	for ( i = fileMap->begin(); i != fileMap->end(); ++i) {
+		delete i->second;
+	}
 
 	mongoc_cleanup();
 

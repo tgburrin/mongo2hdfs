@@ -1,5 +1,6 @@
 #include <iostream>
 #include <csignal>
+#include <ctime>
 
 #include <thread>
 #include <mutex>
@@ -32,25 +33,56 @@ using namespace std;
 // Ugh a global, but the signal handler will need this
 bool running = true;
 
+void flushUpdates(vector<MongoShardInfo> *shards, unordered_map<string, HdfsFile*> *fileMap, time_t *lastFlushTime) {
+	// lock all files
+	for ( auto it = fileMap->begin(); it != fileMap->end(); ++it ) {
+		HdfsFile *fd = it->second;
+		fd->lck->lock();
+		fd->flushFile();
+	}
+
+	vector<MongoShardInfo>::iterator it;
+	for( it = shards->begin(); it != shards->end(); ++it )
+		it->saveBookmark();
+
+	for ( auto it = fileMap->begin(); it != fileMap->end(); ++it ) {
+		HdfsFile *fd = it->second;
+		fd->lck->unlock();
+	}
+
+	time(lastFlushTime);
+}
+
+void flushByTimeThread(bool *running, time_t *lastFlushTime, vector<MongoShardInfo> *shards, unordered_map<string, HdfsFile*> *fileMap) {
+	time_t currentTime;
+
+	while( *running ) {
+		time(&currentTime);
+		if ( currentTime - *lastFlushTime > 30 ) {
+			flushUpdates(shards, fileMap, lastFlushTime);
+			cout << "Flushing updates based on time" << endl << flush;
+		}
+		usleep(500);
+	}
+}
+
 void consumeEvents(bool *running,
-		string clusterURI,
-		MongoShardInfo shardInfo,
+		time_t *lastFlushTime,
+		uint64_t *messageCounter,
+		mutex *messageCounterLock,
+		vector<MongoShardInfo> *shards,
+		MongoShardInfo *shardInfo,
 		bool initializeFromOplogStart,
 		unordered_map<string, HdfsFile*> *fileMap,
 		HdfsFileFactory *f,
 		mutex *fileCreatorLock) {
 
-	MongoOplogClient mc = MongoOplogClient(clusterURI, shardInfo.getShardURI());
+	MongoOplogClient mc = MongoOplogClient(shardInfo->getClusterURI(), shardInfo->getShardURI());
 
 	MongoMessage *m = NULL;
 
 	while ( *running ) {
-		while(mc.readOplogEvent(shardInfo.getBookmark(), initializeFromOplogStart)) {
-			if ( m != NULL ) {
-				delete m;
-				m = NULL;
-			}
-
+		while( *running && mc.readOplogEvent(shardInfo->getBookmark(), initializeFromOplogStart) ) {
 			try {
 				 m = mc.getEvent();
 			} catch (MongoException *e) {
@@ -84,17 +116,31 @@ void consumeEvents(bool *running,
 			}
 
 			fd->lck->lock();
-			if ( fd->writeToFile(m->message) )
-				shardInfo.updateBookmark(m->timestamp, m->txnoffset);
+			fd->writeToFile(m->message);
 			fd->lck->unlock();
+
+			shardInfo->updateBookmark(m->timestamp, m->txnoffset);
+
+			messageCounterLock->lock();
+			(*messageCounter)++;
+			if ( (*messageCounter) > 100000 ) {
+				try {
+					flushUpdates(shards, fileMap, lastFlushTime);
+				} catch (ApplicationException *e) {
+					cerr << e->what() << endl << flush;
+					exit(EXIT_FAILURE);
+				}
+				(*messageCounter) = 0;
+			}
+			messageCounterLock->unlock();
+
+			delete m;
+			m = NULL;
 		}
 		this_thread::yield();
 	}
-	if ( m != NULL ) {
-		shardInfo.updateBookmark(m->timestamp, m->txnoffset);
+	if ( m != NULL )
 		delete m;
-		m = NULL;
-	}
 }
 
 void gracefulShutdown( int signum ) {
@@ -119,6 +165,7 @@ string PrintUsage( string program_name ) {
 }
 
 int main (int argc, char **argv) {
+	time_t lastFlushTime;
 	string configFile;
 
 	int opt;
@@ -169,10 +216,9 @@ int main (int argc, char **argv) {
 	// the shard bookmarks
 	BookmarkManager book = BookmarkManager(cfg);
 
-	string clusterURI = cfg->getMongosURI();
 	vector<MongoShardInfo> shards;
 	try {
-		shards = MongoUtilities::getShardUris(clusterURI, &book);
+		shards = MongoUtilities::getShardUris(cfg->getMongosURI(), &book);
 	} catch ( ApplicationException &e ) {
 		cerr << e.what() << endl;
 		exit(EXIT_FAILURE);
@@ -181,22 +227,46 @@ int main (int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
+	uint64_t messageCounter = 0;
+	time(&lastFlushTime);
+	mutex messageCounterLock;
+
+	thread timeflushThread(flushByTimeThread, &running, &lastFlushTime, &shards, fileMap);
+
 	vector<thread> children;
-	for( auto shard : shards )
-		children.push_back(thread(consumeEvents, &running, clusterURI, shard, cfg->getMongoInitFromStart(), fileMap, fileCreator, &fileCreatorLock));
+	for( auto it = shards.begin(); it != shards.end(); ++it) {
+		children.push_back(thread(consumeEvents,
+				&running,
+				&lastFlushTime,
+				&messageCounter,
+				&messageCounterLock,
+
+				&shards,
+				&(*it),
+				cfg->getMongoInitFromStart(),
+
+				fileMap,
+				fileCreator,
+				&fileCreatorLock));
+	}
 
 	for( uint i = 0; i < children.size(); i++ )
 		if( children.at(i).joinable() )
 			children.at(i).join();
 
-	unordered_map<string, HdfsFile*>::const_iterator i;
-	for ( i = fileMap->begin(); i != fileMap->end(); ++i) {
-		delete i->second;
-	}
+	timeflushThread.join();
+
+	cout << "Flushing outstanding messages and updating bookmarks" << endl;
+	flushUpdates(&shards, fileMap, &lastFlushTime);
+
+	for ( auto it = fileMap->begin(); it != fileMap->end(); ++it)
+		delete it->second;
 
 	mongoc_cleanup();
 
 	delete fileMap;
 	delete fileCreator;
 	delete cfg;
+
+	cout << "Done" << endl;
 }

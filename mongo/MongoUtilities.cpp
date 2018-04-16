@@ -39,6 +39,7 @@ vector<MongoShardInfo> MongoUtilities::getShardUris(string mongosURI, BookmarkMa
 				p.push_back(s);
 
 			MongoShardInfo ms(p[0], "mongodb://"+p[1]+"/?replicaSet="+p[0], book);
+			ms.clusterURI = mongosURI;
 			rv.push_back(ms);
 		}
 	}

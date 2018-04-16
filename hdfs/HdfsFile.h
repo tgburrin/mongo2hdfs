@@ -35,11 +35,11 @@ private:
 	hdfsFS fileSystem = NULL;
 	hdfsFile fileDescriptor = NULL;
 
-	uint32_t batchCounter;
 	uint32_t replicationFactor;
 
+	uint64_t unflushedWrites = 0;
+
 	bool closeFile();
-	bool flushFile();
 	bool openFile(string);
 	bool changeFile(string);
 
@@ -48,6 +48,7 @@ private:
 public:
 	mutex *lck = NULL;
 	bool writeToFile(string);
+	bool flushFile();
 	// We might want to make this private and have a cleaning process
 	virtual ~HdfsFile();
 };

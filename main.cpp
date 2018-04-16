@@ -28,6 +28,9 @@
 #include "hdfs/HdfsFile.h"
 #include "hdfs/HdfsFileFactory.h"
 
+#define DEFAULT_NUMBER_RECORD_LIMIT 10000
+#define DEFAULT_TIME_RECORD_LIMIT 30
+
 using namespace std;
 
 // Ugh a global, but the signal handler will need this
@@ -58,7 +61,7 @@ void flushByTimeThread(bool *running, time_t *lastFlushTime, vector<MongoShardIn
 
 	while( *running ) {
 		time(&currentTime);
-		if ( currentTime - *lastFlushTime > 30 ) {
+		if ( currentTime - *lastFlushTime >= DEFAULT_TIME_RECORD_LIMIT ) {
 			flushUpdates(shards, fileMap, lastFlushTime);
 			cout << "Flushing updates based on time" << endl << flush;
 		}
@@ -110,11 +113,6 @@ void consumeEvents(bool *running,
 			}
 			fileCreatorLock->unlock();
 
-			if ( fd == NULL ) {
-				cerr << "Unable to open fd" << endl << flush;
-				exit(EXIT_FAILURE);
-			}
-
 			fd->lck->lock();
 			fd->writeToFile(m->message);
 			fd->lck->unlock();
@@ -123,7 +121,7 @@ void consumeEvents(bool *running,
 
 			messageCounterLock->lock();
 			(*messageCounter)++;
-			if ( (*messageCounter) > 100000 ) {
+			if ( (*messageCounter) >= DEFAULT_NUMBER_RECORD_LIMIT ) {
 				try {
 					flushUpdates(shards, fileMap, lastFlushTime);
 				} catch (ApplicationException *e) {
@@ -200,6 +198,8 @@ int main (int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
+	// Register the signal that will allow us to clean up and shutdown
+	// CTRL-C for now
 	signal(SIGINT, &gracefulShutdown);
 
 	// Shared by all threads since they will all have records from sharded collections
@@ -231,6 +231,7 @@ int main (int argc, char **argv) {
 	time(&lastFlushTime);
 	mutex messageCounterLock;
 
+	// Start the by time thread
 	thread timeflushThread(flushByTimeThread, &running, &lastFlushTime, &shards, fileMap);
 
 	vector<thread> children;
@@ -250,6 +251,7 @@ int main (int argc, char **argv) {
 				&fileCreatorLock));
 	}
 
+	// Block the main thread until children start exiting
 	for( uint i = 0; i < children.size(); i++ )
 		if( children.at(i).joinable() )
 			children.at(i).join();

@@ -8,7 +8,7 @@
 #include "HdfsFile.h"
 
 HdfsFile::HdfsFile(string u, string h, uint32_t p, uint32_t rf, string bp) : username(u), hostname(h), port(p), replicationFactor(rf), basePath(bp) {
-	batchCounter = 0;
+	unflushedWrites = 0;
 
 	if ( lck == NULL )
 		lck = new mutex();
@@ -60,13 +60,7 @@ bool HdfsFile::writeToFile(string message) {
 	if ( !rv )
 		throw HdfsFileException("Write to "+fileName+" failed");
 
-	rv = false;
-	batchCounter++;
-	if ( batchCounter >= 1000 ) {
-		flushFile();
-		rv = true;
-		batchCounter = 0;
-	}
+	unflushedWrites++;
 	return rv;
 }
 
@@ -76,17 +70,17 @@ bool HdfsFile::changeFile(string newFileName) {
 }
 
 bool HdfsFile::closeFile() {
-	bool rv = false;
-
-	if ( fileSystem != NULL && fileDescriptor != NULL ) {
-		cout << "Flushing " << fileName << endl << flush;
-		flushFile();
-		rv = hdfsCloseFile(fileSystem, fileDescriptor) == 0 ? true : false;
-	}
-
-	return rv;
+	if ( fileSystem != NULL && fileDescriptor != NULL )
+		return hdfsCloseFile(fileSystem, fileDescriptor) == 0 ? true : false;
+	return true;
 }
 
 bool HdfsFile::flushFile() {
-	return hdfsFlush(fileSystem, fileDescriptor) == 0 ? true : false;
+	if ( unflushedWrites > 0 ) {
+		if ( hdfsFlush(fileSystem, fileDescriptor) == 0 )
+			unflushedWrites = 0;
+		else
+			throw HdfsFileException("Unable to flush "+fileName+": "+string(hdfsGetLastError()));
+	}
+	return true;
 }

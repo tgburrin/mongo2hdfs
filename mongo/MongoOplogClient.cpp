@@ -20,11 +20,12 @@ MongoOplogClient::~MongoOplogClient() {
 void MongoOplogClient::startCursor(bson_t *bookmark, bool initializeFromOplogStart) {
 	time_t currentTime = time(NULL);
 
-	if ( bookmark == NULL )
+	if ( bookmark == NULL ) {
 		if ( initializeFromOplogStart )
 			bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(0, 0), "}");
 		else
 			bookmark = BCON_NEW("ts", "{", "$gte", BCON_TIMESTAMP(currentTime, 0), "}");
+	}
 
 	bson_t *filter = BCON_NEW(
 			"fromMigrate", "{",

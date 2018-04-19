@@ -20,11 +20,13 @@ class MongoShardInfo {
 private:
 	friend class MongoUtilities;
 
+	string clusterURI;
+
 	string shardName;
 	string shardURI;
 
-	uint32_t timestamp = 0;
-	uint32_t increment = 0;
+	uint32_t timestamp;
+	uint32_t increment;
 
 	BookmarkManager *bookmark;
 
@@ -38,9 +40,11 @@ public:
 
 	string getShardName();
 	string getShardURI();
+	string getClusterURI();
 
 	bson_t *getBookmark();
 	void updateBookmark(uint32_t, uint32_t);
+	void saveBookmark();
 };
 
 #endif /* MONGO_MONGOSHARDINFO_H_ */

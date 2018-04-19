@@ -8,6 +8,8 @@
 #include "MongoShardInfo.h"
 
 MongoShardInfo::MongoShardInfo(string name, string uri, BookmarkManager *book) : shardName(name), shardURI(uri), bookmark(book) {
+	timestamp = 0;
+	increment = 0;
 	refreshBookmark();
 }
 MongoShardInfo::~MongoShardInfo() {
@@ -26,6 +28,10 @@ string MongoShardInfo::getShardURI() {
 	return shardURI;
 }
 
+string MongoShardInfo::getClusterURI() {
+	return clusterURI;
+}
+
 bson_t *MongoShardInfo::getBookmark() {
 	return findTs;
 }
@@ -39,5 +45,8 @@ void MongoShardInfo::refreshBookmark() {
 void MongoShardInfo::updateBookmark(uint32_t ts, uint32_t inc) {
 	timestamp = ts;
 	increment = inc;
+}
+
+void MongoShardInfo::saveBookmark() {
 	bookmark->setBookmark(shardName, &timestamp, &increment);
 }
